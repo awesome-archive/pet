@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +9,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/knqyf263/pet/config"
+	"github.com/knqyf263/pet/dialog"
 	"github.com/knqyf263/pet/snippet"
 )
 
@@ -41,8 +42,23 @@ func filter(options []string) (commands []string, err error) {
 	snippetTexts := map[string]snippet.SnippetInfo{}
 	var text string
 	for _, s := range snippets.Snippets {
-		t := fmt.Sprintf("[%s] %s", s.Description, s.Command)
+		command := s.Command
+		if strings.ContainsAny(command, "\n") {
+			command = strings.Replace(command, "\n", "\\n", -1)
+		}
+		t := fmt.Sprintf("[%s]: %s", s.Description, command)
+
+		tags := ""
+		for _, tag := range s.Tag {
+			tags += fmt.Sprintf(" #%s", tag)
+		}
+		t += tags
+
 		snippetTexts[t] = s
+		if config.Flag.Color {
+			t = fmt.Sprintf("[%s]: %s%s",
+				color.RedString(s.Description), command, color.BlueString(tags))
+		}
 		text += t + "\n"
 	}
 
@@ -54,11 +70,16 @@ func filter(options []string) (commands []string, err error) {
 		return nil, nil
 	}
 
-	if buf.Len() == 0 {
-		return commands, errors.New("No line is selected")
-	}
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
 
+	params := dialog.SearchForParams(lines)
+	if params != nil {
+		snippetInfo := snippetTexts[lines[0]]
+		dialog.CurrentCommand = snippetInfo.Command
+		dialog.GenerateParamsLayout(params, dialog.CurrentCommand)
+		res := []string{dialog.FinalCommand}
+		return res, nil
+	}
 	for _, line := range lines {
 		snippetInfo := snippetTexts[line]
 		commands = append(commands, fmt.Sprint(snippetInfo.Command))

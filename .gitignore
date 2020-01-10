@@ -25,3 +25,11 @@ _testmain.go
 .env
 out
 pkg
+.DS_Store
+.idea/
+.vscode/
+
+.glide/
+vendor/
+pet
+dist/
